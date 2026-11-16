@@ -1,67 +1,68 @@
 # Incident Copilot
 
-Помощник для разбора инцидентов по логам и документации.
+An assistant for investigating incidents using logs and documentation.
 
-## Статус
+## Status
 
-Подготовлена спецификация и план задач. Реализация сервиса ещё не начата.
+The specification and task plan are ready. Service implementation has not started.
 
-## Сценарий
+## How it works
 
-Пользователь описывает сбой. Сервис находит подходящие фрагменты документации и тестовых логов, формирует вероятные причины, прикладывает источники и предлагает шаги проверки. Если данных недостаточно, ответ содержит ограничения и уточняющие вопросы. Помощник не исправляет production автоматически.
+A user describes a failure. The service finds relevant documentation and test logs, suggests possible causes, provides sources, and lists checks to run. If evidence is missing, it explains the limits and asks for more information. It does not fix production systems automatically.
 
-## Стек и подход
+## Stack and approach
 
-- Go: HTTP API, orchestration и клиент модели.
-- PostgreSQL: задания, документы, фрагменты и результаты; pgvector — для векторного поиска на этапе RAG.
-- Один LLM-провайдер за интерфейсом; конфигурация модели через окружение.
-- Docker Compose для локального окружения после реализации.
-- Первый этап — один процесс и синхронный запрос. Worker и очередь заданий в PostgreSQL добавляются при переходе к асинхронному анализу; отдельный брокер в MVP не нужен.
+- Go: HTTP API, request flow, and model client.
+- PostgreSQL: jobs, documents, chunks, and results. Add pgvector for vector search in the RAG phase.
+- One LLM provider behind an interface. Choose the model through configuration.
+- Docker Compose for the local environment once it is implemented.
+- Start with one process and synchronous requests. Add a worker and a PostgreSQL job queue when background analysis is needed. The MVP does not need a separate message broker.
 
-## Этапы
+## Phases
 
-1. **LLM API:** описание ошибки → структурированный разбор с явными ограничениями.
-2. **RAG:** загрузка Markdown/TXT → поиск фрагментов → ответ с проверяемыми ссылками.
-3. **Инструменты и надёжность:** поиск по синтетическим логам, лимиты, метрики и регрессионная оценка.
+1. **LLM API:** incident description → structured analysis with clear limitations.
+2. **RAG:** Markdown/TXT upload → document search → answers with source links.
+3. **Tools and reliability:** synthetic log search, limits, metrics, and quality regression checks.
 
-Ориентир — 12 недель по 4–6 часов в неделю. Срок корректируется по результатам первого этапа.
+Initial estimate: 12 weeks at 4–6 hours per week. Adjust the plan after the first phase.
 
-## Документация
+## Documentation
 
-- [Техническое задание](docs/SPEC.md)
-- [Эпик и задачи](docs/EPIC.md)
+- [Technical specification](docs/SPEC.md)
+- [Epic and tasks](docs/EPIC.md)
+- [GitHub epic](https://github.com/alekslesik/incident-copilot/issues/1)
 
-## Первый результат
+## First milestone
 
-Реализовать `POST /v1/analyses`: принять описание ошибки и вернуть JSON с гипотезами, шагами проверки и недостающими данными. Проверить успешный ответ, timeout, ошибку провайдера и некорректный JSON модели. Затем переходить к RAG.
+Build `POST /v1/analyses`: accept an incident description and return JSON with possible causes, verification steps, and missing information. Check successful responses, timeouts, provider errors, and invalid model JSON. Then add RAG.
 
-## Работа с данными
+## Data handling
 
-Использовать синтетические логи и тестовую документацию. Ключи передавать через окружение; не коммитить секреты и реальные рабочие логи. Перед отправкой провайдеру редактировать потенциальные секреты; тексты документов и логов считать недоверенными данными.
+Use synthetic logs and test documentation. Read API keys from environment variables. Do not commit secrets or real work logs. Redact possible secrets before sending data to the provider. Treat document and log text as untrusted input.
 
-## Локальный запуск
+## Local setup
 
-Команды запуска появятся вместе с реализацией первого этапа. Сейчас репозиторий содержит только проектную документацию.
+Run commands will be added with the first implementation phase. The repository currently contains project documentation only.
 
-## Материалы для разработки
+## Development resources
 
-Материалы сгруппированы по задачам проекта. Читать по мере реализации: сначала вызов модели и контракт ответа, затем оценка качества, RAG и инструменты. Примеры OpenAI — один вариант интеграции; провайдер в архитектуре остаётся заменяемым.
+Use these resources as you build each part. Start with model calls and response format, then quality checks, RAG, and tools. The OpenAI examples show one integration option; the architecture keeps the provider replaceable.
 
-| Материал | Что разобрать | Где применить |
+| Resource | What to learn | Project tasks |
 | --- | --- | --- |
-| [Официальный Go SDK OpenAI](https://github.com/openai/openai-go) | Создание клиента, запросы через Responses API, обработка ошибок и настройка повторов. Согласовать повторы SDK с повторами сервиса, чтобы не умножить число запросов. | T02: первый вызов модели из Go |
-| [Structured Outputs — документация OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs) | JSON Schema, ограничения поддерживаемых схем, отказ модели и незавершённый ответ. Корректный JSON не гарантирует правильность гипотез. | T03: структурированный разбор и валидация |
-| [Evaluation best practices — документация OpenAI](https://developers.openai.com/api/docs/guides/evaluation-best-practices) | Набор контрольных примеров, критерии качества, сравнение вариантов и регрессионные проверки. | T04 и T07: baseline и сравнение с RAG |
-| [Retrieval — документация OpenAI](https://developers.openai.com/api/docs/guides/retrieval) | Semantic search, embeddings, разбиение документов и поиск релевантных фрагментов. Реализация в руководстве использует управляемые vector stores OpenAI; для проекта переносим принципы в PostgreSQL. | T05–T07: ответы по документации |
-| [pgvector: официальная документация](https://github.com/pgvector/pgvector) | Векторные расстояния, точный и приближённый поиск, HNSW/IVFFlat и фильтрация. Начать с точного поиска; индексы добавлять по измерениям. | T06: хранение embeddings и retrieval |
-| [Function calling — документация OpenAI](https://developers.openai.com/api/docs/guides/function-calling) | Цикл «модель запросила инструмент → приложение проверило аргументы и выполнило вызов → модель получила результат». Права, лимиты и исполнение остаются в коде сервиса. | T08: read-only инструмент поиска логов |
-| [OpenTelemetry Go: Getting Started](https://opentelemetry.io/docs/languages/go/getting-started/) | Подключение телеметрии к HTTP-сервису, spans и метрики. Отдельно измерять retrieval, LLM-запросы и инструмент поиска. | T11: диагностика задержек и ошибок |
+| [Official OpenAI Go SDK](https://github.com/openai/openai-go) | Create a client, call the Responses API, handle errors, and configure retries. Coordinate SDK and service retries so they do not multiply requests. | T02: first model call |
+| [OpenAI: Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) | JSON Schema, supported schema limits, refusals, and incomplete responses. Valid JSON does not guarantee a correct diagnosis. | T03: response format and validation |
+| [OpenAI: Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices) | Test cases, scoring rules, comparisons, and regression checks. A baseline is the first result used for comparison. | T04 and T07: baseline vs. RAG |
+| [OpenAI: Retrieval](https://developers.openai.com/api/docs/guides/retrieval) | Semantic search, embeddings, document chunks, and relevant context. This guide uses OpenAI-managed vector stores; apply the concepts to PostgreSQL in this project. | T05–T07: document-based answers |
+| [pgvector documentation](https://github.com/pgvector/pgvector) | Vector distances, exact and approximate search, HNSW/IVFFlat, and filters. Start with exact search and add indexes based on measurements. | T06: embeddings and search |
+| [OpenAI: Function calling](https://developers.openai.com/api/docs/guides/function-calling) | Model requests a tool → application validates and runs it → model receives the result. Keep permissions, limits, and execution in application code. | T08: read-only log search |
+| [OpenTelemetry Go: Getting Started](https://opentelemetry.io/docs/languages/go/getting-started/) | Add telemetry to an HTTP service. Use spans and metrics to measure document search, LLM requests, and tool calls separately. | T11: diagnose latency and errors |
 
-### С чего начать
+### Where to start
 
-1. В Go SDK разобрать минимальный запрос к модели и обработку ошибки; реализовать T02.
-2. По Structured Outputs описать JSON-контракт анализа и проверить невалидные, отказные и незавершённые ответы; реализовать T03.
-3. Подготовить контрольные вопросы и baseline по руководству об оценке качества; выполнить T04 до подключения RAG.
-4. Затем перейти к Retrieval и pgvector, после измерения качества — к Function calling.
+1. Use the Go SDK guide to make a small model request and handle errors: T02.
+2. Define the analysis JSON format with Structured Outputs. Test invalid output, refusals, and incomplete responses: T03.
+3. Build a fixed test set and measure the baseline before adding RAG: T04.
+4. Move to Retrieval and pgvector. After measuring answer quality, add function calling.
 
-Для RAG сначала понять цепочку: документ → фрагменты → embeddings → поиск → контекст модели → ответ с источниками. После каждого этапа сравнивать качество, задержку и расход токенов на одном наборе примеров.
+For RAG, first understand this flow: document → chunks → embeddings → search → model context → answer with sources. After each phase, compare quality, response time, and token usage on the same test cases.
